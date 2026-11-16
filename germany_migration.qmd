@@ -1,0 +1,383 @@
+---
+title: "Germany's Population and Migration: A Data Visualisation Recreation"
+author: "Polina Novikova"
+format:
+  html:
+    embed-resources: true
+    code-fold: true
+    code-summary: "Show R code"
+    code-tools: true
+toc: true
+number-sections: true
+---
+
+# Introduction {.unnumbered}
+
+This project focuses on recreating a data visualisation illustrating the relationship between Germany's population development and net migration over time.
+
+The original visualisation was created by Luc Guillemot and uses data from the United Nations. My objective was to reproduce its design using R and ggplot2, while practising more advanced visualisation techniques.
+
+Rather than presenting an original statistical analysis, this project focuses on visual communication: transforming historical data into an informative and visually engaging chart.
+
+The visualisation highlights several historical periods and uses annotations, colour gradients and carefully positioned labels to guide the reader through the data.
+
+```{r}
+#| label: setup
+#| include: false
+
+library(ggplot2)
+library(dplyr)
+library(ggtext)
+library(here)
+```
+
+# Data and preparation
+
+The dataset contains historical observations of Germany's population and net migration rate.
+
+The first step is to import the dataset and prepare the variables for visualisation. This involves assigning meaningful column names, converting variables to numeric format, removing observations with missing years and adjusting population values to millions where necessary.
+
+The original dataset is stored in the `data` folder within this project.
+
+```{r}
+#| label: data-preparation
+
+temp_env <- new.env()
+
+loaded_names <- load(here("data", "germany_migration_data.RData"),
+  envir = temp_env
+)
+
+my_data <- temp_env[[loaded_names[1]]]
+
+# Rename the first three columns
+colnames(my_data)[1:3] <- c("year","population","migration_rate")
+
+# Ensure all variables are stored in numeric format
+my_data$year <- as.numeric(my_data$year)
+my_data$population <- as.numeric(my_data$population)
+my_data$migration_rate <- as.numeric(my_data$migration_rate)
+
+# Remove missing years and arrange observations
+my_data <- my_data |>
+  filter(!is.na(year)) |>
+  arrange(year)
+
+# Convert population to millions where necessary
+if (max(my_data$population, na.rm = TRUE) > 1000000) {
+  my_data$population <- my_data$population / 1000000
+}
+```
+
+# Preparing the visual elements
+
+Before constructing the chart, several additional variables are created to control its visual appearance.
+
+First, selected historical periods are identified and displayed in grey. This creates a visual distinction between different periods of Germany's population development.
+
+Second, a set of key years is selected for annotation. These observations are highlighted using larger points and year labels.
+
+Because some labels would otherwise overlap with the data points or other annotations, their positions are adjusted manually using separate horizontal and vertical offsets.
+
+Finally, the minimum and maximum years are identified to ensure that the colour gradient remains consistent across the visualisation.
+
+```{r}
+#| label: visual-elements
+# Identify historical periods to be displayed in grey
+grey_periods <- my_data |> 
+  filter(year <= 1952 |
+      (year >= 1973 & year <= 1984) |
+      (year >= 2000 & year <= 2007)) |> 
+  mutate(grey_group = case_when(
+      year <= 1952 ~ 1,
+      year >= 1973 & year <= 1984 ~ 2,
+      year >= 2000 & year <= 2007 ~ 3
+    )
+  )
+
+# Years that need labels
+key_years <- c(1950, 1973, 1980, 1984, 1991, 2000, 2007, 2016, 2022)
+
+labels_data <- my_data |> 
+  filter(year %in% key_years) |> 
+  mutate(
+    move_x = case_when(
+      year == 1950 ~ 0.45,
+      year == 1984 ~ -0.35,
+      year == 1973 ~ 0.35,
+      year == 2007 ~ -0.35,
+      year == 2000 ~ 0.35,
+      TRUE ~ 0
+    ),
+    move_y = case_when(
+      year == 1950 ~ 0,
+      year == 1973 ~ -0.1,
+      year == 1980 ~ -0.5,
+      year == 1984 ~ 0,
+      year == 1991 ~ 0.5,
+      year == 2000 ~ 0,
+      year == 2007 ~ 0,
+      year == 2016 ~ 0.5,
+      year == 2022 ~ -0.5,
+      TRUE ~ 0.35
+    )
+  )
+
+# Identify highlighted years that will use grey markers
+grey_highlight_years <- c(1950, 1980, 2000, 2007)
+
+# keep the same year colours for the whole graph
+min_yr <- min(my_data$year)
+max_yr <- max(my_data$year)
+
+```
+
+# Building the visualisation
+
+The visualisation is constructed using ggplot2, with population on the horizontal axis and net migration rate on the vertical axis.
+
+Several graphical layers are combined to create the final chart.
+
+The main trajectory is represented by a path whose colour changes over time, using a gradient from yellow to orange and pink. Selected historical periods are overlaid in grey to create visual contrast.
+
+Additional layers highlight important observations, add year labels and provide contextual annotations explaining different stages of Germany's population development.
+
+The chart also includes custom axis scales, descriptive labels and a minimalist theme to improve readability.
+
+```{r}
+#| label: build-visualisation
+
+# Initialise the plot using population and net migration data
+final_plot <- ggplot(
+  my_data, aes(x = population, y = migration_rate)) +
+
+# Add a reference line at zero to distinguish positive and negative net migration
+  geom_hline(yintercept = 0, color = "grey60", linewidth = 0.5) +
+
+# Draw the main trajectory, with colour representing the year
+  geom_path(aes(color = year), linewidth = 2.5, alpha = 0.35) +
+
+# Highlight selected historical periods in grey
+  geom_path(data = grey_periods, aes(group = grey_group),
+    color = "grey65",linewidth = 2.5) +
+
+  # Add points representing individual yearly observations
+  geom_point(aes(color = year),size = 1.2) +
+
+  # Display observations from the highlighted periods in grey
+  geom_point(data = grey_periods, color = "grey55", size = 1.25) +
+
+  # Highlight selected years with larger circular markers
+  geom_point(data = filter(labels_data, !year %in% grey_highlight_years),
+    aes(fill = year),
+    shape = 21,
+    color = "black",
+    size = 2.2,
+    stroke = 0.6
+  ) +
+
+  # Use grey markers for selected years within the highlighted periods
+  geom_point(
+    data = filter(labels_data, year %in% grey_highlight_years),
+    fill = "grey55", shape = 21, color = "black", size = 2.2, stroke = 0.6) +
+
+  # Add year labels with manually adjusted positions
+  geom_text(
+    data = labels_data,
+    aes(x = population + move_x, y = migration_rate + move_y, label = year),
+    size = 3.2, fontface = "bold", color = "#222222") +
+
+  # Apply a yellow-to-pink colour gradient to represent the progression of time
+  scale_color_gradientn(colors = c("#f6d258", "#e27442", "#c2335b"),
+    limits = c(min_yr, max_yr),
+    guide = "none") +
+  scale_fill_gradientn(colors = c("#f6d258", "#e27442", "#c2335b"),
+    limits = c(min_yr, max_yr),
+    guide = "none") +
+
+  # Set axis breaks, limits and labels
+  scale_x_continuous(breaks = seq(69, 84, by = 1),
+    labels = function(x) paste0(x, "M"),
+    limits = c(68, 84.5),
+    expand = c(0, 0)) +
+  scale_y_continuous(breaks = seq(-12, 10, by = 2),
+    limits = c(-12.5, 10.5),
+    expand = c(0, 0)) +
+
+  # Add the title, subtitle and source information
+  labs(
+    title = "Germany's population growth has been driven by immigration",
+    subtitle = paste(
+      "In the postwar era, Germany has experienced three periods",
+      "of population growth. Only the first was significantly driven by births."
+    ),
+    x = "",
+    y = "",
+    caption = paste0(
+      "Population based on Germany's current borders<br>",
+      "Chart: Luc Guillemot • Source: United Nations"
+    )) +
+
+  # Add labels identifying population and net migration
+  annotate("text", x = 68.1, y = 10, label = "Net migration rate",
+    fontface = "bold", hjust = 0,
+    size = 3.3, color = "grey40") +
+  annotate("text", x = 84.3, y = -12, label = "Total population",
+    fontface = "bold", hjust = 1, size = 3.3, color = "grey40") +
+
+  # Explain the meaning of positive and negative net migration
+  annotate("text", x = 68.1, y = 1.5, 
+    label = "▲\nMore immigration\nthan emigration",
+    size = 3, hjust = 0, color = "#555555") +
+  annotate("text", x = 68.1, y = -1.5,
+    label = "More emigration\nthan immigration\n▼",
+    size = 3, hjust = 0, color = "#555555") +
+
+  # Indicate the direction of time along the trajectory
+  annotate("richtext", x = 71.3, y = -4.5, 
+    label = "**Time follows<br>the line**",size = 3, hjust = 0,
+    fill = NA, label.color = NA) +
+  annotate("point", x = 71.3, y = -3.9, shape = 17, size = 1.2) +
+
+  # Annotate the increase in immigration after World War II
+  annotate("richtext", x = 69.5, y = -7.5,
+    label = "Immigration<br>increases<br>dramatically<br>post WWII",
+    size = 3, hjust = 0.5, color = "#555555", fill = NA, label.color = NA) +
+  annotate("segment", x = 70.3, y = -7.5, xend = 70.9, yend = -7.5,
+    color = "#888888", linewidth = 0.3) +
+
+  # Add historical context for population growth during the economic miracle
+  annotate("richtext", x = 72, y = 5.5,
+    label = paste0(
+      "During the \"economic miracle,\" millions of<br>",
+      "**guest workers** come to Germany.<br>",
+      "The **fertility rate is also still high**, which explains<br>",
+      "this dramatic population growth."),
+    size = 3, hjust = 0, color = "#555555",fill = NA, label.color = NA) +
+
+  annotate("segment", x = 73, y = 4,
+    xend = 73, yend = 1.5, color = "#888888", linewidth = 0.3) +
+
+  # Explain the decline between 1973 and 1980 and the subsequent policy changes
+  annotate("richtext", x = 78.5, y = -5,
+    label = paste0(
+      "Between 1973 and 1980, the world is in crisis.<br>",
+      "Immigration slows and the population declines.<br>",
+      "In the 1970s, Germany passes **family reunification**<br>",
+      "**laws**, which help to restart immigration."),
+    size = 3, hjust = 0.5,
+    color = "#555555", fill = NA, label.color = NA) +
+
+  annotate("segment", x = 78.5, y = -3.5,
+    xend = 78.5, yend = -0.5, color = "#888888", linewidth = 0.3) +
+
+  # Annotate renewed population growth before German reunification
+  annotate("richtext", x = 78, y = 8.5,
+    label = paste0(
+      "Immigration drives renewed<br>",
+      "population growth in the<br>",
+      "years leading up to<br>",
+      "German reunification."),
+    size = 3, hjust = 0.5,
+    color = "#555555",
+    fill = NA, label.color = NA) +
+
+  annotate("segment", x = 78, y = 7.2, xend = 78, yend = 5.5,
+    color = "#888888", linewidth = 0.3) +
+
+  # Explain migration-related population growth following EU enlargement
+  annotate("richtext", x = 81.5, y = 8.5,
+    label = paste0(
+      "After the **expansion of the EU** in the 2000s,<br>",
+      "many Eastern Europeans migrate to Germany,<br>",
+      "mainly from Poland and Romania."),
+    size = 3, hjust = 0.5,
+    color = "#555555", fill = NA, label.color = NA) +
+
+  annotate("segment", x = 81.5, y = 7.2,
+    xend = 81.5, yend = 4.5,color = "#888888", linewidth = 0.3) +
+
+  # Apply the final theme and adjust the appearance of the chart
+  theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(color = "grey30", linewidth = 0.4),
+    axis.text = element_text(size = 10, color = "grey40"),
+    plot.title = element_text(
+      size = 17, face = "bold",
+      margin = margin(b = 6)
+    ),
+    plot.subtitle = element_text(
+      size = 11.5,
+      margin = margin(b = 20)
+    ),
+    plot.caption = element_markdown(
+      hjust = 0,
+      lineheight = 1.5,
+      margin = margin(t = 18)
+    ),
+    plot.title.position = "plot",
+    plot.caption.position = "plot",
+    plot.margin = margin(15, 15, 15, 15)
+  )
+```
+
+# Final visualisation
+
+The final chart combines the population trajectory, migration patterns, historical highlights and explanatory annotations.
+
+The result is an editorial-style visualisation designed to guide the reader through the relationship between population development and migration over time.
+
+```{r}
+#| label: final-chart
+#| fig-width: 12.4
+#| fig-height: 8.8
+
+final_plot
+
+```
+
+# Exporting the visualisation
+
+The final visualisation is exported as a high-resolution PNG image. This allows it to be viewed independently of the R environment and included in other project documentation.
+
+```{r}
+#| label: export-chart
+#| include: false
+
+ggsave(
+  filename = here("figures", "germany_migration.png"),
+  plot = final_plot,
+  width = 12.4,
+  height = 8.8,
+  dpi = 200,
+  units = "in",
+  bg = "white"
+)
+```
+
+# What I learned
+
+This project allowed me to practise several advanced ggplot2 techniques and explore how detailed visual design can improve data communication.
+
+In particular, I worked with:
+
+- Layered visualisations using `geom_path()`, `geom_point()` and `geom_text()`.
+- Continuous colour gradients to represent time.
+- Custom annotations and manually positioned labels.
+- Separately highlighting specific observations and historical periods.
+- Advanced theme customisation and formatting using ggplot2 and ggtext.
+
+One of the main challenges was balancing the amount of information displayed in the chart while maintaining readability.
+
+This exercise also demonstrated how visualisation choices can guide the interpretation of historical data.
+
+# Sources and attribution
+
+**Original visualisation:** Luc Guillemot.
+
+**Data source:** United Nations.
+
+This project is an educational recreation of an existing data visualisation. Credit for the original visual concept and narrative belongs to its original creator.
+
+The code was independently implemented in R using ggplot2 and related packages.
