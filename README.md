@@ -24,15 +24,26 @@ I recreated the chart using R and ggplot2, adapting the original visual design a
 
 **Licence:** The original Datawrapper blog content is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). This recreated and adapted visualisation is shared under the same licence. Changes were made to the implementation and presentation.
 
-## Data Source
+## Data Source and Licensing
 
-The data used in the original visualisation comes from:
+The underlying demographic data used in the original visualisation come from:
 
 **United Nations, Department of Economic and Social Affairs, Population Division (2022). World Population Prospects 2022.**
 
 [United Nations World Population Prospects](https://population.un.org/wpp/)
 
-The dataset contains historical observations of Germany's population and net migration rate.
+The original chart and its associated data were accessed through Luc Guillemot's Datawrapper article:
+
+[Connecting the dots of population growth in Germany](https://www.datawrapper.de/blog/germany-population-connected-scatterplot)
+
+The Datawrapper article identifies the United Nations as the original data source. The dataset used in this project is a prepared RData file based on the data accessed for this reproduction.
+
+**Licensing and attribution:**
+
+- The original Datawrapper blog material is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- The United Nations World Population Prospects 2022 publication identifies [CC BY 3.0 IGO](https://creativecommons.org/licenses/by/3.0/igo/) as the licence for its reproducible figures and tables.
+
+The recreated visualisation is credited to its original author, with changes to the implementation and presentation documented in this project.
 
 ## 3. Tools and Technologies
 
